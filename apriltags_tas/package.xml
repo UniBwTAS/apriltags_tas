@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>apriltags_tas</name>
+  <version>0.0.0</version>
+  <description>The apriltags_tas package</description>
+
+  <maintainer email="bianca.forkel@unibw.de">Bianca Forkel</maintainer>
+
+  <license>TODO</license>
+
+  <!-- Url tags are optional, but multiple are allowed, one per tag -->
+  <!-- Optional attribute type can be: website, bugtracker, or repository -->
+  <!-- Example: -->
+  <!-- <url type="website">http://wiki.ros.org/apriltags_tas</url> -->
+
+  <author email="bianca.forkel@unibw.de">Bianca Forkel</author>
+  <author email="jan.kallwies@unibw.de">Jan Kallwies</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>catkin_simple</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>dynamic_reconfigure</depend>
+  <depend>std_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>image_geometry</depend>
+  <depend>image_transport</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf</depend>
+  <depend>cv_bridge</depend>
+  <depend>apriltags</depend>
+  <depend>apriltags_msgs</depend>
+
+</package>

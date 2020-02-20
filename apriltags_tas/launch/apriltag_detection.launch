@@ -1,0 +1,10 @@
+<launch>
+  <node pkg="apriltags_tas" type="apriltag_detector" name="apriltag_detector" output="screen">
+    <rosparam command="load" file="$(find apriltags_tas)/config/tags.yaml"/>
+    <param name="image_topic" value="/camera/image"/>
+    <param name="camera_info_topic" value="/camera/camera_info"/>
+
+    <param name="use_test_input_image" value="true"/>
+    <param name="test_input_image_path" value="$(find apriltags_tas)/example_images/0001.png"/>
+  </node>
+</launch>
