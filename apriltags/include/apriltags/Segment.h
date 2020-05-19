@@ -8,51 +8,91 @@ namespace AprilTags
 {
 
 //! Represents a line fit to a set of pixels whose gradients are similiar.
-	class Segment
-	{
-	public:
-		Segment();
+class Segment
+{
+  public:
+    Segment();
 
-		static int const minimumSegmentSize = 4; //!< Minimum number of pixels in a segment before we'll fit a line to it.
-		static float const minimumLineLength; //!< In pixels. Calculated based on minimum plausible decoding size for Tag9 family.
+    static int const minimumSegmentSize = 4; //!< Minimum number of pixels in a segment before we'll fit a line to it.
+    static float const
+        minimumLineLength; //!< In pixels. Calculated based on minimum plausible decoding size for Tag9 family.
 
-		float getX0() const { return x0; }
-		void setX0(float newValue) { x0 = newValue; }
+    float getX0() const
+    {
+        return x0;
+    }
+    void setX0(float newValue)
+    {
+        x0 = newValue;
+    }
 
-		float getY0() const { return y0; }
-		void setY0(float newValue) { y0 = newValue; }
+    float getY0() const
+    {
+        return y0;
+    }
+    void setY0(float newValue)
+    {
+        y0 = newValue;
+    }
 
-		float getX1() const { return x1; }
-		void setX1(float newValue) { x1 = newValue; }
+    float getX1() const
+    {
+        return x1;
+    }
+    void setX1(float newValue)
+    {
+        x1 = newValue;
+    }
 
-		float getY1() const { return y1; }
-		void setY1(float newValue) { y1 = newValue; }
+    float getY1() const
+    {
+        return y1;
+    }
+    void setY1(float newValue)
+    {
+        y1 = newValue;
+    }
 
-		float getTheta() const { return theta; }
-		void setTheta(float newValue) { theta = newValue; }
+    float getTheta() const
+    {
+        return theta;
+    }
+    void setTheta(float newValue)
+    {
+        theta = newValue;
+    }
 
-		float getLength() const { return length; }
-		void setLength(float newValue) { length = newValue; }
+    float getLength() const
+    {
+        return length;
+    }
+    void setLength(float newValue)
+    {
+        length = newValue;
+    }
 
-		//! Returns the length of the Segment.
-		float segmentLength() const;
+    //! Returns the length of the Segment.
+    float segmentLength() const;
 
-		//! Print endpoint coordinates of this segment.
-		void printSegment() const;
+    //! Print endpoint coordinates of this segment.
+    void printSegment() const;
 
-		//! ID of Segment.
-		int getId() const { return segmentId; }
+    //! ID of Segment.
+    int getId() const
+    {
+        return segmentId;
+    }
 
-		std::vector<Segment*> children;
+    std::vector<Segment*> children;
 
-	private:
-		float x0, y0, x1, y1;
-		float theta; // gradient direction (points towards white)
-		float length; // length of line segment in pixels
-		int segmentId;
-		static int idCounter;
-	};
+  private:
+    float x0, y0, x1, y1;
+    float theta;  // gradient direction (points towards white)
+    float length; // length of line segment in pixels
+    int segmentId;
+    static int idCounter;
+};
 
-} // namsepace
+} // namespace AprilTags
 
 #endif

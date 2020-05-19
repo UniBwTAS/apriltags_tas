@@ -3,39 +3,46 @@
 
 #include <vector>
 
-namespace AprilTags {
+namespace AprilTags
+{
 
 //! Implementation of disjoint set data structure using the union-find algorithm
-class UnionFindSimple {
-  //! Identifies parent ids and sizes.
-  struct Data {
-    int id;
-    int size;
-  };
+class UnionFindSimple
+{
+    //! Identifies parent ids and sizes.
+    struct Data
+    {
+        int id;
+        int size;
+    };
 
-public:
-  explicit UnionFindSimple(int maxId) : data(maxId) {
-    init();
-  };
+  public:
+    explicit UnionFindSimple(int maxId) : data(maxId)
+    {
+        init();
+    };
 
-  int getSetSize(int thisId) { return data[getRepresentative(thisId)].size; }
+    int getSetSize(int thisId)
+    {
+        return data[getRepresentative(thisId)].size;
+    }
 
-  int getRepresentative(int thisId);
+    int getRepresentative(int thisId);
 
-  //! Returns the id of the merged node.
-  /*  @param aId
-   *  @param bId
-   */
-  int connectNodes(int aId, int bId);
+    //! Returns the id of the merged node.
+    /*  @param aId
+     *  @param bId
+     */
+    int connectNodes(int aId, int bId);
 
-  void printDataVector() const;
+    void printDataVector() const;
 
-private:
-  void init();
+  private:
+    void init();
 
-  std::vector<Data> data;
+    std::vector<Data> data;
 };
 
-} // namespace
+} // namespace AprilTags
 
 #endif

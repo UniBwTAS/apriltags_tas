@@ -1,30 +1,32 @@
 #ifndef TAGDETECTOR_H
 #define TAGDETECTOR_H
 
-#include <vector>
 #include <memory>
+#include <vector>
 
 #include "opencv2/opencv.hpp"
 
 #include "apriltags/TagDetection.h"
 #include "apriltags/TagFamily.h"
 
-namespace AprilTags {
+namespace AprilTags
+{
 
-    class TagDetector {
-    public:
+class TagDetector
+{
+  public:
+    typedef std::shared_ptr<TagDetector> Ptr;
 
-        typedef std::shared_ptr<TagDetector> Ptr;
+    const TagFamily thisTagFamily;
 
-        const TagFamily thisTagFamily;
+    //! Constructor
+    // note: TagFamily is instantiated here from TagCodes
+    TagDetector(const TagCodes& tagCodes) : thisTagFamily(tagCodes)
+    {
+    }
 
-        //! Constructor
-        // note: TagFamily is instantiated here from TagCodes
-        TagDetector(const TagCodes& tagCodes) : thisTagFamily(tagCodes) {}
-
-        std::vector<TagDetection> extractTags(const cv::Mat& image) const;
-
-    };
+    std::vector<TagDetection> extractTags(const cv::Mat& image) const;
+};
 
 // 	/*! \brief Class that efficiently performs multi-family tag detections. */
 // 	class MultiTagDetector {
@@ -40,6 +42,6 @@ namespace AprilTags {
 //
 // 	};
 
-} // namespace
+} // namespace AprilTags
 
 #endif
