@@ -24,44 +24,32 @@ int Edge::edgeCost(float  theta0, float theta1, float mag1) {
 
 void Edge::calcEdges(float theta0, int x, int y,
 		     const cv::Mat& theta, const cv::Mat& mag,
-		     std::vector<Edge> &edges, size_t &nEdges) {
+		     std::vector<Edge>& edges) {
   int width = theta.cols;
   int thisPixel = y*width+x;
 
   // horizontal edge
   int cost1 = edgeCost(theta0, theta.at<float>(y,x+1), mag.at<float>(y,x+1));
   if (cost1 >= 0) {
-    edges[nEdges].cost = cost1;
-    edges[nEdges].pixelIdxA = thisPixel;
-    edges[nEdges].pixelIdxB = y*width+x+1;
-    ++nEdges;
+    edges.emplace_back(thisPixel, y*width+x+1, cost1);
   }
 
   // vertical edge
   int cost2 = edgeCost(theta0, theta.at<float>(y+1,x), mag.at<float>(y+1,x));
   if (cost2 >= 0) {
-    edges[nEdges].cost = cost2;
-    edges[nEdges].pixelIdxA = thisPixel;
-    edges[nEdges].pixelIdxB = (y+1)*width+x;
-    ++nEdges;
+    edges.emplace_back(thisPixel, (y+1)*width+x, cost2);
   }
 
   // downward diagonal edge
   int cost3 = edgeCost(theta0, theta.at<float>(y+1,x+1), mag.at<float>(y+1,x+1));
   if (cost3 >= 0) {
-    edges[nEdges].cost = cost3;
-    edges[nEdges].pixelIdxA = thisPixel;
-    edges[nEdges].pixelIdxB = (y+1)*width+x+1;
-    ++nEdges;
+    edges.emplace_back(thisPixel, (y+1)*width+x+1, cost3);
   }
 
   // updward diagonal edge
   int cost4 = (x == 0) ? -1 : edgeCost(theta0, theta.at<float>(y+1,x-1), mag.at<float>(y+1,x-1));
   if (cost4 >= 0) {
-    edges[nEdges].cost = cost4;
-    edges[nEdges].pixelIdxA = thisPixel;
-    edges[nEdges].pixelIdxB = (y+1)*width+x-1;
-    ++nEdges;
+    edges.emplace_back(thisPixel, (y+1)*width+x-1, cost4);
   }
 }
 

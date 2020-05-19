@@ -100,46 +100,45 @@ void extract_edges( const cv::Mat& filteredSeg, const cv::Mat& filteredMag,
 	int width = filteredSeg.cols;
 	int height = filteredSeg.rows;
 
-	std::vector<Edge> edges(width*height*4);
-	size_t nEdges = 0;
+	std::vector<Edge> edges;
+	edges.reserve(width*height*4);
 
-// Bounds on the thetas assigned to this group. Note that because
-// theta is periodic, these are defined such that the average
-// value is contained *within* the interval.
+	// Bounds on the thetas assigned to this group. Note that because
+	// theta is periodic, these are defined such that the average
+	// value is contained *within* the interval.
 	{ // limit scope of storage
 		/* Previously all this was on the stack, but this is 1.2MB for 320x240 images
 		* That's already a problem for OS X (default 512KB thread stack size),
 		* could be a problem elsewhere for bigger images... so store on heap */
-		std::vector<float> storage(width*height*4);  // do all the memory in one big block, exception safe
+		std::vector<float> storage;  // do all the memory in one big block, exception safe
+		storage.reserve(width*height*4);
 		float * tmin = &storage[width*height*0];
 		float * tmax = &storage[width*height*1];
 		float * mmin = &storage[width*height*2];
 		float * mmax = &storage[width*height*3];
 
 		for (int y = 0; y+1 < height; y++) {
-		for (int x = 0; x+1 < width; x++) {
+			for (int x = 0; x+1 < width; x++) {
+				float mag0 = filteredMag.at<float>(y,x);
+				if (mag0 < Edge::minMag)
+					continue;
+				mmax[y*width+x] = mag0;
+				mmin[y*width+x] = mag0;
 
-			float mag0 = filteredMag.at<float>(y,x);
-			if (mag0 < Edge::minMag)
-			continue;
-			mmax[y*width+x] = mag0;
-			mmin[y*width+x] = mag0;
+				float theta0 = filteredTheta.at<float>(y,x);
+				tmin[y*width+x] = theta0;
+				tmax[y*width+x] = theta0;
 
-			float theta0 = filteredTheta.at<float>(y,x);
-			tmin[y*width+x] = theta0;
-			tmax[y*width+x] = theta0;
+				// Calculates then adds edges to 'vector<Edge> edges'
+				Edge::calcEdges(theta0, x, y, filteredTheta, filteredMag, edges);
 
-			// Calculates then adds edges to 'vector<Edge> edges'
-			Edge::calcEdges(theta0, x, y, filteredTheta, filteredMag, edges, nEdges);
-
-			// TODO Would 8 connectivity help for rotated tags?
-			// Probably not much, so long as input filtering hasn't been disabled.
+				// TODO Would 8 connectivity help for rotated tags?
+				// Probably not much, so long as input filtering hasn't been disabled.
+			}
 		}
-		}
 
-		edges.resize(nEdges);
 		std::stable_sort(edges.begin(), edges.end());
-		Edge::mergeEdges(edges,uf,tmin,tmax,mmin,mmax);
+		Edge::mergeEdges(edges, uf, tmin, tmax, mmin, mmax);
 	}
 }
 
