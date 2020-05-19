@@ -1,12 +1,5 @@
-#include <algorithm>
-#include <cmath>
-#include <climits>
-#include <map>
 #include <vector>
 #include <chrono>
-#include <iostream>
-
-#include <Eigen/Dense>
 
 #include "apriltags/TagDetector.h"
 #include "apriltags/TagDetectionUtils.h"
