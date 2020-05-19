@@ -81,16 +81,18 @@ void preprocess_image( const cv::Mat& orig, cv::Mat& filtered,
 	filteredTheta = cv::Mat( filteredSeg.size(), CV_32FC1 );
 	filteredMag = cv::Mat( filteredSeg.size(), CV_32FC1 );
 
-	for( int i = 1; i < filteredSeg.rows-1; i++ )
-	{
-		for( int j = 1; j < filteredSeg.cols-1; j++ )
+	filteredMag.forEach<float>([&](float& mag, const int position[]) {
+		const int j = position[1];
+		const int i = position[0];
+
+		if (i > 0 && j > 0 && i < filteredSeg.rows - 1 && j < filteredSeg.cols - 1)
 		{
-			float Ix = filteredSeg.at<float>(i,j+1) - filteredSeg.at<float>(i,j-1);
-			float Iy = filteredSeg.at<float>(i+1,j) - filteredSeg.at<float>(i-1,j);
+			const float Ix = filteredSeg.at<float>(i,j+1) - filteredSeg.at<float>(i,j-1);
+			const float Iy = filteredSeg.at<float>(i+1,j) - filteredSeg.at<float>(i-1,j);
+			mag = Ix*Ix + Iy*Iy;
 			filteredTheta.at<float>(i,j) = std::atan2(Iy, Ix);
-			filteredMag.at<float>(i,j) = Ix*Ix + Iy*Iy;
 		}
-	}
+	});
 }
 
 void extract_edges( const cv::Mat& filteredSeg, const cv::Mat& filteredMag,
