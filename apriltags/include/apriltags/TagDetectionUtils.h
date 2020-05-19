@@ -1,5 +1,7 @@
 #ifndef TAG_DETECTION_UTILS_H
 
+#include <chrono>
+
 #include "apriltags/TagDetection.h"
 #include "apriltags/TagFamily.h"
 #include "apriltags/Quad.h"
@@ -8,6 +10,7 @@
 
 namespace AprilTags
 {
+	void print_timing(const std::string& label, std::chrono::time_point<std::chrono::high_resolution_clock>& t_last, const bool reset=false);
 
 // 	template<class D>
 // 	void convert_mat( const cv::Mat& src, FloatImage& dst, float scale=1.0 )

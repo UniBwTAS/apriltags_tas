@@ -3,6 +3,7 @@
 #include <climits>
 #include <map>
 #include <vector>
+#include <chrono>
 #include <iostream>
 
 #include <Eigen/Dense>
@@ -15,6 +16,7 @@ using namespace std;
 namespace AprilTags {
 
 std::vector<TagDetection> TagDetector::extractTags(const cv::Mat& image) const {
+	auto t_last = std::chrono::high_resolution_clock::now();
 
 	// convert to internal AprilTags image (todo: slow, change internally to OpenCV)
 	int width = image.cols;
@@ -35,6 +37,10 @@ std::vector<TagDetection> TagDetector::extractTags(const cv::Mat& image) const {
 	cv::Mat fimCV, fimSegCV, fimThetaCV, fimMagCV;
 	preprocess_image( fimOrigCV, fimCV, fimSegCV, fimThetaCV, fimMagCV );
 
+#ifdef ENABLE_TIMING_MEASUREMENT
+	print_timing("preprocess_image", t_last, true);
+#endif
+
 	//================================================================
 	// Step three. Extract edges by grouping pixels with similar
 	// thetas together. This is a greedy algorithm: we start with
@@ -42,13 +48,25 @@ std::vector<TagDetection> TagDetector::extractTags(const cv::Mat& image) const {
 	UnionFindSimple uf( fimSegCV.cols*fimSegCV.rows );
 	extract_edges( fimSegCV, fimMagCV, fimThetaCV, uf );
 
+#ifdef ENABLE_TIMING_MEASUREMENT
+	print_timing("extract_edges", t_last);
+#endif
+
 	// Steps 4-5
 	std::vector<Segment> segments;
 	fit_segments( fimSegCV, fimMagCV, fimThetaCV, uf, segments );
 
+#ifdef ENABLE_TIMING_MEASUREMENT
+	print_timing("fit_segments", t_last);
+#endif
+
 	// Steps 6-7
 	std::vector<Quad> quads;
 	find_quads( segments, fimOrigCV.size(), opticalCenter, quads );
+
+#ifdef ENABLE_TIMING_MEASUREMENT
+	print_timing("find_quads", t_last);
+#endif
 
 	//================================================================
 	// Step eight. Decode the quads. For each quad, we first estimate a
@@ -60,7 +78,13 @@ std::vector<TagDetection> TagDetector::extractTags(const cv::Mat& image) const {
 	//broken lines. When two quads (with the same id) overlap, we will
 	//keep the one with the lowest error, and if the error is the same,
 	//the one with the greatest observed perimeter.
-	return decode_quads( fimCV, quads, thisTagFamily );
+	const auto res = decode_quads( fimCV, quads, thisTagFamily );
+
+#ifdef ENABLE_TIMING_MEASUREMENT
+	print_timing("decode_quads", t_last);
+#endif
+
+	return res;
 }
 
 } // namespace

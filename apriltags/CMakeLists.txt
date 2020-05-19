@@ -17,6 +17,9 @@ catkin_package(
   DEPENDS Eigen OpenCV
 )
 
+# Comment in the following line to show detailed timing measurements
+#ADD_DEFINITIONS(-DENABLE_TIMING_MEASUREMENT)
+
 include_directories(include include/AprilTags)
 include_directories(
   ${Eigen_INCLUDE_DIRS}

@@ -10,6 +10,23 @@
 namespace AprilTags
 {
 
+void print_timing(const std::string& label, std::chrono::time_point<std::chrono::high_resolution_clock>& t_last, const bool reset)
+{
+    static int total_time = 0;
+
+    if (reset)
+    {
+        total_time = 0;
+    }
+
+    const int t_step = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t_last).count();
+
+    total_time += t_step;
+
+    std::cout << label << " took " << t_step << " ms, total: " << total_time << "ms" << std::endl;
+    t_last = std::chrono::high_resolution_clock::now();
+}
+
 void preprocess_image( const cv::Mat& orig, cv::Mat& filtered,
 					   cv::Mat& filteredSeg, cv::Mat& filteredTheta, cv::Mat& filteredMag,
 					   float sigma, float segSigma )
