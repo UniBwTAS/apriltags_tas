@@ -58,7 +58,10 @@ void AprilTagDetector::reconfigure(apriltags_tas::AprilTagDetectorConfig& config
         apriltag_cpp_detector_ = std::make_shared<AprilTags::TagDetector>(tag_codes);
     }
 
-    process(image_);
+    if(!image_.empty())
+    {
+        process(image_);
+    }
 }
 
 void AprilTagDetector::imageCallback(const sensor_msgs::ImageConstPtr& msg)
