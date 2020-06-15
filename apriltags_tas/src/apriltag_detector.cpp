@@ -58,7 +58,7 @@ void AprilTagDetector::reconfigure(apriltags_tas::AprilTagDetectorConfig& config
         apriltag_cpp_detector_ = std::make_shared<AprilTags::TagDetector>(tag_codes);
     }
 
-    if(!image_.empty())
+    if (!image_.empty())
     {
         process(image_);
     }
@@ -429,9 +429,9 @@ void AprilTagDetector::publishTagDetections(std::vector<AprilTags::TagDetection>
             p.x = tag.p[i].first;
             p.y = tag.p[i].second;
             tag_msg.corners_px.push_back(p);
-
-            tag_msg.pose_valid = getPose(tag, tag_msg.pose_3d);
         }
+        tag_msg.id = std::to_string(tag.id);
+        tag_msg.pose_valid = getPose(tag, tag_msg.pose_3d);
         detections_msg.detections.push_back(tag_msg);
     }
     detections_pub_.publish(detections_msg);
