@@ -89,7 +89,7 @@ void AprilTagDetector::process(const cv::Mat& image)
         refineCornerPointsByDirectEdgeOptimization(gray_image, tag_detections);
     }
 
-    if (config_.filter_cross_croners)
+    if (config_.filter_cross_corners)
     {
         filterCrossCorners(gray_image, tag_detections);
     }
