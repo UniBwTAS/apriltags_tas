@@ -43,13 +43,15 @@ int main(int argc, char** argv)
     apriltag_detector.detections_pub_ = nh.advertise<apriltags_msgs::AprilTagDetections>("detections", 1, false);
     apriltag_detector.image_pub_ = it.advertise("image", 1);
 
+    std::unique_ptr<image_transport::Subscriber> sub;
+
     if (!use_test_input_image)
     {
         std::string image_topic;
         nh.getParam("image_topic", image_topic);
 
-        image_transport::Subscriber sub =
-            it.subscribe(image_topic, 1, &AprilTagDetector::imageCallback, &apriltag_detector);
+        sub = std::make_unique<image_transport::Subscriber>(
+            it.subscribe(image_topic, 1, &AprilTagDetector::imageCallback, &apriltag_detector));
     }
     else
     {
