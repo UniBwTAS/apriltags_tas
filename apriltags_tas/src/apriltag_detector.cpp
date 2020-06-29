@@ -445,7 +445,7 @@ void AprilTagDetector::publishTfTransform(std::vector<AprilTags::TagDetection>& 
     for (AprilTags::TagDetection& tag : tag_detections)
     {
         apriltag_ros::TagDescription* tag_description;
-        if (tag_config_.findTagDescription(tag.id, tag_description))
+        if (tag_config_.findTagDescription(tag.id, tag_description) && tag_description->frame_name != "")
         {
             geometry_msgs::Pose pose;
             bool pose_valid = getPose(tag, pose);
