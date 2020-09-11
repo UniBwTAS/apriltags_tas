@@ -38,7 +38,11 @@ class AprilTagDetector
     std::vector<AprilTags::TagDetection> detectAprilTags(cv::Mat& img) noexcept;
     void refineCornerPointsByDirectEdgeOptimization(cv::Mat& img,
                                                     std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
-    void filterCrossCorners(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
+    void refineCornerPointsByOpenCVCornerRefinement(cv::Mat& img,
+                                                    std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
+    void filterCrossCorners(cv::Mat& img,
+                            std::vector<AprilTags::TagDetection>& tag_detections,
+                            cv::Mat& output_image) noexcept;
 
     void filterUnknownTags(std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
     void removeBadTags(std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
@@ -47,7 +51,7 @@ class AprilTagDetector
 
     void publishTagDetections(std::vector<AprilTags::TagDetection>& tag_detections, std_msgs::Header header) noexcept;
     void publishTfTransform(std::vector<AprilTags::TagDetection>& tag_detections, std_msgs::Header header) noexcept;
-    void drawTagDetections(cv::Mat img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
+    void drawTagDetections(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept;
 
     std::shared_ptr<AprilTags::TagDetector> apriltag_cpp_detector_;
 
