@@ -34,23 +34,23 @@ void AprilTagDetector::reconfigure(apriltags_tas::AprilTagDetectorConfig& config
     {
         AprilTags::TagCodes tag_codes{AprilTags::tagCodes36h11};
 
-        if (config.tag_family == 0)
+        if (config.tag_family == apriltags_tas::AprilTagDetector_16h5)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes16h5);
         }
-        else if (config.tag_family == 1)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h7)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h7);
         }
-        else if (config.tag_family == 2)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h9)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h9);
         }
-        else if (config.tag_family == 3)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h9)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h9);
         }
-        else if (config.tag_family == 4)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h11)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h11);
         }
@@ -91,9 +91,13 @@ void AprilTagDetector::process(const cv::Mat& image)
         filterUnknownTags(tag_detections);
     }
 
-    if (config_.refine_corners)
+    if (config_.refinement_method == apriltags_tas::AprilTagDetector_AdvEdgeRefinement)
     {
         refineCornerPointsByDirectEdgeOptimization(gray_image, tag_detections);
+    }
+    else if (config_.refinement_method == apriltags_tas::AprilTagDetector_CornerRefinement)
+    {
+        refineCornerPointsByOpenCVCornerRefinement(gray_image, tag_detections);
     }
 
     if (config_.filter_cross_corners)
@@ -111,7 +115,13 @@ void AprilTagDetector::process(const cv::Mat& image)
 
     if (config_.draw_image)
     {
-        drawTagDetections(image.clone(), tag_detections);
+        cv::Mat output_img;
+        output_img = image.clone();
+
+        drawTagDetections(output_img, tag_detections);
+
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", output_img).toImageMsg();
+        image_pub_.publish(msg);
     }
 }
 
@@ -268,7 +278,36 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
     ROS_INFO_STREAM("Refined " << tag_detections.size() << " tags.");
 }
 
-void AprilTagDetector::filterCrossCorners(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::refineCornerPointsByOpenCVCornerRefinement(
+    cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+{
+    ROS_INFO_STREAM("refineCornerPointsByOpenCVCornerRefinement(...)");
+
+    for (AprilTags::TagDetection& tag : tag_detections)
+    {
+        std::vector<cv::Point2f> corners;
+
+        for (int i = 0; i < 4; i++)
+        {
+            corners.emplace_back(tag.p[i].first, tag.p[i].second);
+        }
+
+        const cv::Size win_size(10, 10);
+        const cv::Size zero_zone(-1, -1);
+        const cv::TermCriteria term_criteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 40, 0.0001);
+
+        cv::cornerSubPix(img, corners, win_size, zero_zone, term_criteria);
+
+        for (int i = 0; i < 4; i++)
+        {
+            tag.p[i].first = corners[i].x;
+            tag.p[i].second = corners[i].y;
+        }
+    }
+}
+
+void AprilTagDetector::filterCrossCorners(cv::Mat& img,
+                                          std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
     cv::Mat img_binary;
     cv::adaptiveThreshold(img, img_binary, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 21, 2);
@@ -282,15 +321,25 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img, std::vector<AprilTags::T
 
     for (AprilTags::TagDetection& tag : tag_detections)
     {
+        auto cornerPos = [&tag](const int i) { return cv::Point2f(tag.p[i].first, tag.p[i].second); };
+
+        const float l1 = cv::norm(cornerPos(0) - cornerPos(1));
+        const float l2 = cv::norm(cornerPos(1) - cornerPos(2));
+        const float l3 = cv::norm(cornerPos(2) - cornerPos(3));
+        const float l4 = cv::norm(cornerPos(3) - cornerPos(0));
+
+        const float mean_tag_size = (l1 + l2 + l3 + l4) / 4.0;
+
         for (int i = 0; i < 4; i++)
         {
-            const cv::Point2f corner(tag.p[i].first, tag.p[i].second);
+            const cv::Point2f corner = cornerPos(i);
 
             std::vector<std::pair<float, float>> sections;
             std::vector<int> section_colors;
 
-            float r = 5;
+            const float r = mean_tag_size * (config_.filter_cross_corners_radius_percent / 100.0);
             float last_phi = 0;
+
             for (float phi = 0; phi < 2 * M_PI; phi += 10.0 * M_PI / 180.0)
             {
                 const float s = std::sin(phi);
@@ -477,7 +526,7 @@ void AprilTagDetector::publishTfTransform(std::vector<AprilTags::TagDetection>& 
     }
 }
 
-void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::drawTagDetections(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
     int line_thickness = img.size[0] / 400;
 
@@ -523,6 +572,4 @@ void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::Tag
                     cv::viz::Color::azure(),
                     text_thickness);
     }
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img).toImageMsg();
-    image_pub_.publish(msg);
 }
