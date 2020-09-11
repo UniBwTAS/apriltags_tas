@@ -34,23 +34,23 @@ void AprilTagDetector::reconfigure(apriltags_tas::AprilTagDetectorConfig& config
     {
         AprilTags::TagCodes tag_codes{AprilTags::tagCodes36h11};
 
-        if (config.tag_family == 0)
+        if (config.tag_family == apriltags_tas::AprilTagDetector_16h5)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes16h5);
         }
-        else if (config.tag_family == 1)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h7)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h7);
         }
-        else if (config.tag_family == 2)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h9)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h9);
         }
-        else if (config.tag_family == 3)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h9)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h9);
         }
-        else if (config.tag_family == 4)
+        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h11)
         {
             tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h11);
         }
@@ -84,6 +84,13 @@ void AprilTagDetector::process(const cv::Mat& image)
     cv::Mat gray_image;
     cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
 
+    cv::Mat output_img;
+
+    if (config_.publish_debug_image)
+    {
+        output_img = image.clone();
+    }
+
     std::vector<AprilTags::TagDetection> tag_detections = detectAprilTags(gray_image);
 
     if (config_.only_known_tags)
@@ -91,14 +98,18 @@ void AprilTagDetector::process(const cv::Mat& image)
         filterUnknownTags(tag_detections);
     }
 
-    if (config_.refine_corners)
+    if (config_.refinement_method == apriltags_tas::AprilTagDetector_AdvEdgeRefinement)
     {
         refineCornerPointsByDirectEdgeOptimization(gray_image, tag_detections);
+    }
+    else if (config_.refinement_method == apriltags_tas::AprilTagDetector_CornerRefinement)
+    {
+        refineCornerPointsByOpenCVCornerRefinement(gray_image, tag_detections);
     }
 
     if (config_.filter_cross_corners)
     {
-        filterCrossCorners(gray_image, tag_detections);
+        filterCrossCorners(gray_image, tag_detections, output_img);
     }
 
     publishTagDetections(tag_detections, img_header_);
@@ -109,9 +120,15 @@ void AprilTagDetector::process(const cv::Mat& image)
         tag_config_.processBundles(tag_detections, camera_model_, img_header_);
     }
 
-    if (config_.draw_image)
+    if (config_.draw_detections)
     {
-        drawTagDetections(image.clone(), tag_detections);
+        drawTagDetections(output_img, tag_detections);
+    }
+
+    if (config_.publish_debug_image)
+    {
+        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", output_img).toImageMsg();
+        image_pub_.publish(msg);
     }
 }
 
@@ -268,7 +285,37 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
     ROS_INFO_STREAM("Refined " << tag_detections.size() << " tags.");
 }
 
-void AprilTagDetector::filterCrossCorners(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::refineCornerPointsByOpenCVCornerRefinement(
+    cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+{
+    ROS_INFO_STREAM("refineCornerPointsByOpenCVCornerRefinement(...)");
+
+    for (AprilTags::TagDetection& tag : tag_detections)
+    {
+        std::vector<cv::Point2f> corners;
+
+        for (int i = 0; i < 4; i++)
+        {
+            corners.emplace_back(tag.p[i].first, tag.p[i].second);
+        }
+
+        const cv::Size win_size(10, 10);
+        const cv::Size zero_zone(-1, -1);
+        const cv::TermCriteria term_criteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 40, 0.0001);
+
+        cv::cornerSubPix(img, corners, win_size, zero_zone, term_criteria);
+
+        for (int i = 0; i < 4; i++)
+        {
+            tag.p[i].first = corners[i].x;
+            tag.p[i].second = corners[i].y;
+        }
+    }
+}
+
+void AprilTagDetector::filterCrossCorners(cv::Mat& img,
+                                          std::vector<AprilTags::TagDetection>& tag_detections,
+                                          cv::Mat& output_img) noexcept
 {
     cv::Mat img_binary;
     cv::adaptiveThreshold(img, img_binary, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 21, 2);
@@ -278,19 +325,39 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img, std::vector<AprilTags::T
     cv::morphologyEx(img_binary, img_binary, cv::MORPH_OPEN, morph_kernel);
     cv::morphologyEx(img_binary, img_binary, cv::MORPH_CLOSE, morph_kernel);
 
+    if (config_.draw_cross_corner_filter_debug_info)
+    {
+        cv::cvtColor(img_binary, output_img, CV_GRAY2BGR);
+    }
+
     int invalid_tags = 0;
 
     for (AprilTags::TagDetection& tag : tag_detections)
     {
+        auto cornerPos = [&tag](const int i) { return cv::Point2f(tag.p[i].first, tag.p[i].second); };
+
+        const float l1 = cv::norm(cornerPos(0) - cornerPos(1));
+        const float l2 = cv::norm(cornerPos(1) - cornerPos(2));
+        const float l3 = cv::norm(cornerPos(2) - cornerPos(3));
+        const float l4 = cv::norm(cornerPos(3) - cornerPos(0));
+
+        const float mean_tag_size = (l1 + l2 + l3 + l4) / 4.0;
+
         for (int i = 0; i < 4; i++)
         {
-            const cv::Point2f corner(tag.p[i].first, tag.p[i].second);
+            const cv::Point2f corner = cornerPos(i);
 
             std::vector<std::pair<float, float>> sections;
             std::vector<int> section_colors;
 
-            float r = 5;
+            const float r = mean_tag_size * (config_.filter_cross_corners_radius_percent / 100.0);
             float last_phi = 0;
+
+            if (config_.draw_cross_corner_filter_debug_info)
+            {
+                cv::circle(output_img, corner, r, cv::Scalar(0, 0, 255), 1);
+            }
+
             for (float phi = 0; phi < 2 * M_PI; phi += 10.0 * M_PI / 180.0)
             {
                 const float s = std::sin(phi);
@@ -477,9 +544,11 @@ void AprilTagDetector::publishTfTransform(std::vector<AprilTags::TagDetection>& 
     }
 }
 
-void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::drawTagDetections(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
     int line_thickness = img.size[0] / 400;
+
+    cv::Mat overlay = img.clone();
 
     for (AprilTags::TagDetection& tag : tag_detections)
     {
@@ -489,22 +558,22 @@ void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::Tag
         double text_thickness = fontscale * 3;
 
         // plot outline
-        cv::line(img,
+        cv::line(overlay,
                  cv::Point2f(tag.p[0].first, tag.p[0].second),
                  cv::Point2f(tag.p[1].first, tag.p[1].second),
                  cv::viz::Color::red(),
                  line_thickness);
-        cv::line(img,
+        cv::line(overlay,
                  cv::Point2f(tag.p[1].first, tag.p[1].second),
                  cv::Point2f(tag.p[2].first, tag.p[2].second),
                  cv::viz::Color::green(),
                  line_thickness);
-        cv::line(img,
+        cv::line(overlay,
                  cv::Point2f(tag.p[2].first, tag.p[2].second),
                  cv::Point2f(tag.p[3].first, tag.p[3].second),
                  cv::viz::Color::blue(),
                  line_thickness);
-        cv::line(img,
+        cv::line(overlay,
                  cv::Point2f(tag.p[3].first, tag.p[3].second),
                  cv::Point2f(tag.p[0].first, tag.p[0].second),
                  cv::viz::Color::magenta(),
@@ -515,7 +584,7 @@ void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::Tag
         int fontface = cv::FONT_HERSHEY_SIMPLEX;
         int baseline;
         cv::Size textsize = cv::getTextSize(text, fontface, fontscale, text_thickness, &baseline);
-        cv::putText(img,
+        cv::putText(overlay,
                     text,
                     cv::Point((int)(tag.cxy.first - textsize.width / 2), (int)(tag.cxy.second + textsize.height / 2)),
                     fontface,
@@ -523,6 +592,6 @@ void AprilTagDetector::drawTagDetections(cv::Mat img, std::vector<AprilTags::Tag
                     cv::viz::Color::azure(),
                     text_thickness);
     }
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", img).toImageMsg();
-    image_pub_.publish(msg);
+
+    cv::addWeighted(img, 1.0 - config_.tag_overlay_alpha, overlay, config_.tag_overlay_alpha, 0, img);
 }
