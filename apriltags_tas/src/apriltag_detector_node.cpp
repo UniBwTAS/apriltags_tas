@@ -1,5 +1,4 @@
 #include <dynamic_reconfigure/server.h>
-#include <image_transport/image_transport.h>
 #include <ros/ros.h>
 
 #include <apriltags_msgs/AprilTagDetections.h>
@@ -38,20 +37,18 @@ int main(int argc, char** argv)
     dynamic_reconfigure::Server<apriltags_tas::AprilTagDetectorConfig> reconfigure_server;
     reconfigure_server.setCallback(boost::bind(&AprilTagDetector::reconfigure, &apriltag_detector, _1, _2));
 
-    image_transport::ImageTransport it(nh);
-
     apriltag_detector.detections_pub_ = nh.advertise<apriltags_msgs::AprilTagDetections>("detections", 1, false);
-    apriltag_detector.image_pub_ = it.advertise("image", 1);
+    apriltag_detector.image_pub_ = nh.advertise<sensor_msgs::Image>("image", 1);
 
-    std::unique_ptr<image_transport::Subscriber> sub;
+    std::unique_ptr<ros::Subscriber> sub;
 
     if (!use_test_input_image)
     {
         std::string image_topic;
         nh.getParam("image_topic", image_topic);
 
-        sub = std::make_unique<image_transport::Subscriber>(
-            it.subscribe(image_topic, 1, &AprilTagDetector::imageCallback, &apriltag_detector));
+        sub = std::make_unique<ros::Subscriber>(
+            nh.subscribe(image_topic, 1, &AprilTagDetector::imageCallback, &apriltag_detector));
     }
     else
     {

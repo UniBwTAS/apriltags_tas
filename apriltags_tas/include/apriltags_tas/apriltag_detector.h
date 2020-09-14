@@ -30,7 +30,7 @@ class AprilTagDetector
     void imageCallback(const sensor_msgs::ImageConstPtr& msg);
 
     ros::Publisher detections_pub_;
-    image_transport::Publisher image_pub_;
+    ros::Publisher image_pub_;
 
   private:
     void process(const cv::Mat& image);
