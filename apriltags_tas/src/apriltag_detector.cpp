@@ -6,6 +6,8 @@
 
 #include <apriltags_tas/apriltag_detector.h>
 #include <apriltags_tas/edge_cost_functor.h>
+#include <opencv2/aruco.hpp>
+#include <opencv2/aruco/dictionary.hpp>
 #include <opencv2/viz/types.hpp>
 
 #include <chrono>
@@ -91,7 +93,37 @@ void AprilTagDetector::process(const cv::Mat& image)
         output_img = image.clone();
     }
 
-    std::vector<AprilTags::TagDetection> tag_detections = detectAprilTags(gray_image);
+    std::vector<AprilTags::TagDetection> tag_detections;
+
+    // ArUco OpenCV
+    std::vector<std::vector<cv::Point2f>> all_markers_corners;
+    std::vector<std::vector<cv::Point2f>> rejected_image_points;
+    std::vector<int> ids;
+
+    cv::Ptr<::cv::aruco::Dictionary> aruco_opencv_tag_dict_{
+        cv::aruco::getPredefinedDictionary(cv::aruco::DICT_APRILTAG_36h11)};
+    cv::Ptr<::cv::aruco::DetectorParameters> aruco_opencv_parameters_{cv::aruco::DetectorParameters::create()};
+
+    cv::aruco::detectMarkers(
+        gray_image, aruco_opencv_tag_dict_, all_markers_corners, ids, aruco_opencv_parameters_, rejected_image_points);
+
+    ROS_WARN_STREAM(all_markers_corners.size() << " tags detected by ArUco OpenCV");
+    ROS_WARN_STREAM(rejected_image_points.size() << " tag squads rejected by ArUco OpenCV");
+
+    for (int i =0 ; i<all_markers_corners.size(); i++)
+    {
+        const std::vector<cv::Point2f>& tag_corner_points = all_markers_corners[i];
+
+        AprilTags::TagDetection new_detection;
+        new_detection.id = ids[i];
+        new_detection.good = true;
+        for (int i = 0; i < 4; i++)
+        {
+            new_detection.p[i].first = tag_corner_points[i].x;
+            new_detection.p[i].second = tag_corner_points[i].y;
+        }
+        tag_detections.push_back(new_detection);
+    }
 
     if (config_.only_known_tags)
     {
