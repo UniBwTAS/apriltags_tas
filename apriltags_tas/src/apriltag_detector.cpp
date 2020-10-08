@@ -507,6 +507,8 @@ void AprilTagDetector::publishTagDetections(std::vector<AprilTags::TagDetection>
         tag_msg.pose_valid = getPose(tag, tag_msg.pose_3d);
         detections_msg.detections.push_back(tag_msg);
     }
+
+    detections_msg.input_image = *cv_bridge::CvImage(header, "rgb8", image_).toImageMsg();
     detections_pub_.publish(detections_msg);
 }
 
