@@ -74,6 +74,13 @@ void AprilTagDetector::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 void AprilTagDetector::process(const cv::Mat& image)
 {
+    if (detections_pub_.getNumSubscribers() == 0 && image_pub_.getNumSubscribers() == 0)
+    {
+        ROS_WARN_STREAM("No subscribers => Do not detect tags!");
+
+        return;
+    }
+
     cv::Mat gray_image;
     cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
 
