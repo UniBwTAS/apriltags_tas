@@ -237,7 +237,6 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
 
             ceres::Solver::Options solve_options;
             solve_options.linear_solver_type = ceres::DENSE_QR;
-            solve_options.num_linear_solver_threads = 1;
             solve_options.max_num_iterations = 100;
 
             ceres::Solver::Summary summary;
