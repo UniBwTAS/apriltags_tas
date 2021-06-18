@@ -144,9 +144,9 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
         }
 
         x_range.first = std::max(x_range.first - 10, static_cast<float>(0));
-        x_range.second = std::min(x_range.second + 10, static_cast<float>(img.size[0] - 1));
+        x_range.second = std::min(x_range.second + 10, static_cast<float>(img.cols - 1));
         y_range.first = std::max(y_range.first - 10, static_cast<float>(0));
-        y_range.second = std::min(y_range.second + 10, static_cast<float>(img.size[1] - 1));
+        y_range.second = std::min(y_range.second + 10, static_cast<float>(img.rows - 1));
 
         try
         {
