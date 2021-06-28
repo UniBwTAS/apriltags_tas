@@ -161,14 +161,7 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
             int line_thickness = 5;
 
             auto nextCornerIndex = [](const int i) {
-                if (i <= 2)
-                {
-                    return i + 1;
-                }
-                else
-                {
-                    return 0;
-                }
+                return (i+1) % 4;
             };
 
             for (int i = 0; i < 4; i++)
