@@ -133,8 +133,8 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
 {
     for (AprilTags::TagDetection& tag : tag_detections)
     {
-        std::pair<float, float> x_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::min());
-        std::pair<float, float> y_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::min());
+        std::pair<float, float> x_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+        std::pair<float, float> y_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
         for (std::pair<float, float>& corner_point : tag.p)
         {
             x_range.first = std::min(x_range.first, corner_point.first);
