@@ -30,13 +30,13 @@ The configuration of the tag description is adopted from the ROS package [`april
 
 If you use this code, please cite:
 
-- J. Kallwies, B. Forkel and H.-J. Wuensche, “[Determining and Improving the Localization Accuracy of AprilTag Detection](https://ieeexplore.ieee.org/document/TODO),” in Proceedings of IEEE International Conference on Robotics and Automation (ICRA), June 2020.
+- J. Kallwies, B. Forkel and H.-J. Wuensche, “[Determining and Improving the Localization Accuracy of AprilTag Detection](https://ieeexplore.ieee.org/document/9197427),” in Proceedings of IEEE International Conference on Robotics and Automation (ICRA), June 2020.
 
 ```
 @InProceedings{Kallwies2020_AprilTagAccuracy,
   author    = {Jan Kallwies AND Bianca Forkel AND Hans-Joachim Wuensche},
   title     = {{Determining and Improving the Localization Accuracy of AprilTag Detection}},
-  booktitle = Proceedings of IEEE International Conference on Robotics and Automation (ICRA),
+  booktitle = {Proceedings of IEEE International Conference on Robotics and Automation (ICRA)},
   year      = {2020},
   address   = {Paris, France (Virtual Conference)},
   month     = jun,
