@@ -5,11 +5,13 @@ It also includes the improvements proposed in the __ICRA 2020__ Paper __Determin
 
 **Authors**: Jan Kallwies, Bianca Forkel
 
+> **Note:** The [`rosx`](../../tree/rosx) branch extends this package with simultaneous ROS 1 and ROS 2 support. This (`master`) branch is the original ROS 1-only version.
+
 ## Quickstart
 
-Starting with a working ROS installation (Kinetic and Melodic are supported):
+Starting with a working ROS installation (tested with Kinetic, Melodic, and Noetic):
 ```
-export ROS_DISTRO=melodic               # Set this to your distro, e.g. kinetic or melodic
+export ROS_DISTRO=noetic               # Set this to your distro, e.g. kinetic, melodic, or noetic
 source /opt/ros/$ROS_DISTRO/setup.bash  # Source your ROS distro 
 mkdir -p ~/catkin_ws/src                # Make a new workspace 
 cd ~/catkin_ws/src                      # Navigate to the source space
@@ -17,6 +19,7 @@ git clone https://github.com/UniBwTAS/apriltags_tas.git      # Clone the git rep
 cd ~/catkin_ws                          # Navigate to the workspace
 rosdep install --from-paths src --ignore-src -r -y  # Install any missing packages
 catkin build    # Build all packages in the workspace (catkin_make_isolated will work also)
+source devel/setup.bash
 
 # Start it by:
 roslaunch apriltags_tas apriltag_detection.launch
