@@ -1,11 +1,11 @@
 #include <dynamic_reconfigure/server.h>
 #include <ros/ros.h>
 
+#include <apriltag_ros/ros1/common_functions.h>
 #include <apriltags_msgs/AprilTagDetections.h>
 
-#include <apriltag_ros/common_functions.h>
 #include <apriltags_tas/AprilTagDetectorConfig.h>
-#include <apriltags_tas/apriltag_detector.h>
+#include <apriltags_tas/ros1/apriltag_detector_ros.h>
 
 int main(int argc, char** argv)
 {
@@ -32,13 +32,13 @@ int main(int argc, char** argv)
 
     apriltag_ros::TagDetector tag_config(nh);
 
-    AprilTagDetector apriltag_detector(camera_info, tag_config);
+    AprilTagDetectorROS apriltag_detector(use_test_input_image, camera_info, tag_config);
 
     dynamic_reconfigure::Server<apriltags_tas::AprilTagDetectorConfig> reconfigure_server;
-    reconfigure_server.setCallback(boost::bind(&AprilTagDetector::reconfigure, &apriltag_detector, _1, _2));
+    reconfigure_server.setCallback(boost::bind(&AprilTagDetectorROS::reconfigure, &apriltag_detector, _1, _2));
 
     apriltag_detector.detections_pub_ = nh.advertise<apriltags_msgs::AprilTagDetections>("detections", 1, false);
-    apriltag_detector.image_pub_ = nh.advertise<sensor_msgs::Image>("image", 1);
+    apriltag_detector.image_pub_ = nh.advertise<sensor_msgs::Image>("image", 1, true);
 
     std::unique_ptr<ros::Subscriber> sub;
 
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
         nh.getParam("image_topic", image_topic);
 
         sub = std::make_unique<ros::Subscriber>(
-            nh.subscribe(image_topic, 1, &AprilTagDetector::imageCallback, &apriltag_detector));
+            nh.subscribe(image_topic, 1, &AprilTagDetectorROS::imageCallback, &apriltag_detector));
     }
     else
     {

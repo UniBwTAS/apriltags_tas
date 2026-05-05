@@ -48,18 +48,22 @@
 #include <string>
 #include <vector>
 
-#include <XmlRpcException.h>
-#include <cv_bridge/cv_bridge.h>
-#include <eigen3/Eigen/Dense>
-#include <eigen3/Eigen/Geometry>
+#if __has_include(<image_geometry/pinhole_camera_model.hpp>)
+#include <image_geometry/pinhole_camera_model.hpp>
+#else
 #include <image_geometry/pinhole_camera_model.h>
+#endif
+
+#include <geometry_msgs/msg/pose_stamped.hpp>
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/opencv.hpp>
-#include <ros/console.h>
-#include <ros/ros.h>
-#include <sensor_msgs/image_encodings.h>
-#include <tf/transform_broadcaster.h>
+#include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/header.hpp>
+#include <tf2_ros/transform_broadcaster.h>
+#include <yaml-cpp/yaml.h>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
 
 #include <apriltags/TagDetector.h>
 
@@ -69,7 +73,7 @@ namespace apriltag_ros
 class TagDescription
 {
   public:
-    TagDescription(){};
+    TagDescription() {};
     TagDescription(int id, double size, std::string& frame_name) : id(id), size(size), frame_name(frame_name)
     {
     }
@@ -151,28 +155,29 @@ class TagDetector
 {
   private:
     // Other members
+    rclcpp::Node::SharedPtr node_;
     std::map<int, TagDescription> standalone_tag_descriptions_;
     std::vector<TagBundleDescription> tag_bundle_descriptions_;
-    tf::TransformBroadcaster tf_pub_;
+    tf2_ros::TransformBroadcaster tf_pub_;
 
   public:
-    TagDetector(ros::NodeHandle pnh);
+    TagDetector(const rclcpp::Node::SharedPtr& node);
     ~TagDetector() = default;
 
     // Store standalone and bundle tag descriptions
-    std::map<int, TagDescription> parseStandaloneTags(XmlRpc::XmlRpcValue& standalone_tag_descriptions);
-    std::vector<TagBundleDescription> parseTagBundles(XmlRpc::XmlRpcValue& tag_bundles);
-    double xmlRpcGetDoubleWithDefault(XmlRpc::XmlRpcValue& xmlValue, std::string field, double defaultValue) const;
+    std::map<int, TagDescription> parseStandaloneTags(const YAML::Node& standalone_tag_descriptions);
+    std::vector<TagBundleDescription> parseTagBundles(const YAML::Node& tag_bundles);
+    double yamlGetDoubleWithDefault(const YAML::Node& yaml_value, const std::string& field, double defaultValue) const;
 
     bool findTagDescription(int id, TagDescription*& descriptionContainer, bool printWarning = true);
 
-    geometry_msgs::PoseStamped makeTagPose(const Eigen::Matrix4d& transform,
-                                           const Eigen::Quaternion<double> rot_quaternion,
-                                           const std_msgs::Header& header);
+    geometry_msgs::msg::PoseStamped makeTagPose(const Eigen::Matrix4d& transform,
+                                                const Eigen::Quaternion<double> rot_quaternion,
+                                                const std_msgs::msg::Header& header);
 
     void processBundles(std::vector<AprilTags::TagDetection>& tag_detections,
                         image_geometry::PinholeCameraModel& camera_model,
-                        std_msgs::Header header);
+                        std_msgs::msg::Header header);
 
     // Get the pose of the tag in the camera frame
     // Returns homogeneous transformation matrix [R,t;[0 0 0 1]] which

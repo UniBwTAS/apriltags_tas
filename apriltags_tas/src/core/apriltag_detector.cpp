@@ -1,101 +1,77 @@
-#include <geometry_msgs/TransformStamped.h>
-#include <tf2_ros/transform_broadcaster.h>
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cmath>
+#include <limits>
 
-#include <apriltags_msgs/AprilTag.h>
-#include <apriltags_msgs/AprilTagDetections.h>
+#include <ceres/ceres.h>
+#include <Eigen/Dense>
+#include <Eigen/Geometry>
+
+#include <apriltags/TagFamily.h>
+#include <apriltags/Tag16h5.h>
+#include <apriltags/Tag25h7.h>
+#include <apriltags/Tag25h9.h>
+#include <apriltags/Tag36h11.h>
+#include <apriltags/Tag36h9.h>
 
 #include <apriltags_tas/apriltag_detector.h>
 #include <apriltags_tas/edge_cost_functor.h>
-#include <opencv2/viz/types.hpp>
 
-#include <chrono>
-
-AprilTagDetector::AprilTagDetector(const sensor_msgs::CameraInfo::ConstPtr& camera_info,
-                                   apriltag_ros::TagDetector& tag_config)
-    : tag_config_(tag_config)
+AprilTagDetector::AprilTagDetector(Logger info_logger, Logger warn_logger)
+    : info_logger_(info_logger), warn_logger_(warn_logger)
 {
-    if (camera_info)
-    {
-        camera_model_.fromCameraInfo(camera_info);
-    }
 }
 
-void AprilTagDetector::reconfigure(apriltags_tas::AprilTagDetectorConfig& config, uint32_t level)
+void AprilTagDetector::reconfigure(const Config& config, uint32_t level)
 {
-    if (config.publish_tf && !camera_model_.initialized())
-    {
-        config.publish_tf = false;
-        ROS_WARN("No camera info available. Publishing tf is disabled.");
-    }
-
     config_ = config;
 
     if (level & 1)
     {
         AprilTags::TagCodes tag_codes{AprilTags::tagCodes36h11};
 
-        if (config.tag_family == apriltags_tas::AprilTagDetector_16h5)
+        switch (config.tag_family)
         {
-            tag_codes = AprilTags::TagCodes(AprilTags::tagCodes16h5);
-        }
-        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h7)
-        {
-            tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h7);
-        }
-        else if (config.tag_family == apriltags_tas::AprilTagDetector_25h9)
-        {
-            tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h9);
-        }
-        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h9)
-        {
-            tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h9);
-        }
-        else if (config.tag_family == apriltags_tas::AprilTagDetector_36h11)
-        {
-            tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h11);
+            case TagFamily::tag16h5:
+                tag_codes = AprilTags::TagCodes(AprilTags::tagCodes16h5);
+                break;
+            case TagFamily::tag25h7:
+                tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h7);
+                break;
+            case TagFamily::tag25h9:
+                tag_codes = AprilTags::TagCodes(AprilTags::tagCodes25h9);
+                break;
+            case TagFamily::tag36h9:
+                tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h9);
+                break;
+            case TagFamily::tag36h11:
+                tag_codes = AprilTags::TagCodes(AprilTags::tagCodes36h11);
+                break;
         }
 
         apriltag_cpp_detector_ = std::make_shared<AprilTags::TagDetector>(tag_codes);
     }
-
-    if (!image_.empty())
-    {
-        process(image_);
-    }
 }
 
-void AprilTagDetector::imageCallback(const sensor_msgs::ImageConstPtr& msg)
+std::vector<AprilTags::TagDetection> AprilTagDetector::process(const cv::Mat& image_bgr,
+                                                               const std::function<bool(int)>& is_known_tag) noexcept
 {
-    image_ = cv_bridge::toCvShare(msg, "bgr8")->image.clone();
-    img_header_ = msg->header;
-
-    process(image_);
-}
-
-void AprilTagDetector::process(const cv::Mat& image)
-{
-    if (detections_pub_.getNumSubscribers() == 0 && image_pub_.getNumSubscribers() == 0)
-    {
-        ROS_WARN_STREAM("No subscribers => Do not detect tags!");
-
-        return;
-    }
-
     cv::Mat gray_image;
-    cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+    cv::cvtColor(image_bgr, gray_image, cv::COLOR_BGR2GRAY);
 
     std::vector<AprilTags::TagDetection> tag_detections = detectAprilTags(gray_image);
 
     if (config_.only_known_tags)
     {
-        filterUnknownTags(tag_detections);
+        filterUnknownTags(tag_detections, is_known_tag);
     }
 
-    if (config_.refinement_method == apriltags_tas::AprilTagDetector_AdvEdgeRefinement)
+    if (config_.refinement_method == RefinementMethod::AdvEdgeRefinement)
     {
         refineCornerPointsByDirectEdgeOptimization(gray_image, tag_detections);
     }
-    else if (config_.refinement_method == apriltags_tas::AprilTagDetector_CornerRefinement)
+    else if (config_.refinement_method == RefinementMethod::CornerRefinement)
     {
         refineCornerPointsByOpenCVCornerRefinement(gray_image, tag_detections);
     }
@@ -105,36 +81,29 @@ void AprilTagDetector::process(const cv::Mat& image)
         filterCrossCorners(gray_image, tag_detections);
     }
 
-    publishTagDetections(tag_detections, img_header_);
-
-    if (config_.publish_tf)
-    {
-        publishTfTransform(tag_detections, img_header_);
-        tag_config_.processBundles(tag_detections, camera_model_, img_header_);
-    }
-
-    if (config_.draw_image)
-    {
-        cv::Mat output_img;
-        output_img = image.clone();
-
-        drawTagDetections(output_img, tag_detections);
-
-        sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", output_img).toImageMsg();
-        image_pub_.publish(msg);
-    }
+    return tag_detections;
 }
 
 std::vector<AprilTags::TagDetection> AprilTagDetector::detectAprilTags(cv::Mat& img) noexcept
 {
-    auto t_last = std::chrono::high_resolution_clock::now();
+    if (!apriltag_cpp_detector_)
+    {
+        return {};
+    }
+
+    const auto t_last = std::chrono::high_resolution_clock::now();
 
     std::vector<AprilTags::TagDetection> tag_detections = apriltag_cpp_detector_->extractTags(img);
 
     const int t_total =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - t_last)
             .count();
-    ROS_INFO_STREAM("Detected " << tag_detections.size() << " tags in " << t_total << " ms.");
+
+    if (info_logger_)
+    {
+        info_logger_("Detected " + std::to_string(tag_detections.size()) + " tags in " + std::to_string(t_total) +
+                     " ms.");
+    }
     return tag_detections;
 }
 
@@ -168,11 +137,9 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
             std::array<double, 4> estimated_edge_offsets;
             std::array<cv::Mat, 4> mask_images;
 
-            int line_thickness = 5;
+            const int line_thickness = 5;
 
-            auto nextCornerIndex = [](const int i) {
-                return (i+1) % 4;
-            };
+            auto nextCornerIndex = [](const int i) { return (i + 1) % 4; };
 
             for (int i = 0; i < 4; i++)
             {
@@ -205,10 +172,6 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
             }
 
             ceres::Problem optimization_problem;
-
-            // Set up the only cost function (also known as residual). This uses
-            // auto-differentiation to obtain the derivative (jacobian).
-
             ceres::NumericDiffOptions numeric_diff_options;
 
             auto addEdgeResidualBlocks = [&optimization_problem,
@@ -216,8 +179,8 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
                                           &cropped_img,
                                           &estimated_edge_normals,
                                           &estimated_edge_offsets,
-                                          &numeric_diff_options,
-                                          &nextCornerIndex](const int i) {
+                                          &numeric_diff_options](const int i)
+            {
                 const int pixel_count = cv::countNonZero(mask_images[i]);
 
                 ceres::CostFunction* cost_function =
@@ -229,8 +192,12 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
                 optimization_problem.AddResidualBlock(
                     cost_function, nullptr, estimated_edge_normals[i].data(), &estimated_edge_offsets[i]);
 
+#if CERES_VERSION_MAJOR >= 2
+                optimization_problem.SetManifold(estimated_edge_normals[i].data(), new ceres::SphereManifold<2>());
+#else
                 optimization_problem.SetParameterization(estimated_edge_normals[i].data(),
                                                          new ceres::HomogeneousVectorParameterization(2));
+#endif
             };
 
             addEdgeResidualBlocks(0);
@@ -261,21 +228,23 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
                 tag.p[corner_index].second = estimated_corner_pos_roi.y() + roi.y;
             }
         }
-        catch (const std::exception& /*e*/)
+        catch (const std::exception&)
         {
             tag.good = false;
         }
     }
+
     removeBadTags(tag_detections);
 
-    ROS_INFO_STREAM("Refined " << tag_detections.size() << " tags.");
+    if (info_logger_)
+    {
+        info_logger_("Refined " + std::to_string(tag_detections.size()) + " tags.");
+    }
 }
 
 void AprilTagDetector::refineCornerPointsByOpenCVCornerRefinement(
     cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
-    ROS_INFO_STREAM("refineCornerPointsByOpenCVCornerRefinement(...)");
-
     for (AprilTags::TagDetection& tag : tag_detections)
     {
         std::vector<cv::Point2f> corners;
@@ -299,8 +268,7 @@ void AprilTagDetector::refineCornerPointsByOpenCVCornerRefinement(
     }
 }
 
-void AprilTagDetector::filterCrossCorners(cv::Mat& img,
-                                          std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::filterCrossCorners(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
     cv::Mat img_binary;
     cv::adaptiveThreshold(img, img_binary, 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, 21, 2);
@@ -321,7 +289,7 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
         const float l3 = cv::norm(cornerPos(2) - cornerPos(3));
         const float l4 = cv::norm(cornerPos(3) - cornerPos(0));
 
-        const float mean_tag_size = (l1 + l2 + l3 + l4) / 4.0;
+        const float mean_tag_size = (l1 + l2 + l3 + l4) / 4.0f;
 
         for (int i = 0; i < 4; i++)
         {
@@ -330,35 +298,31 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
             std::vector<std::pair<float, float>> sections;
             std::vector<int> section_colors;
 
-            const float r = mean_tag_size * (config_.filter_cross_corners_radius_percent / 100.0);
+            const float r = mean_tag_size * (config_.filter_cross_corners_radius_percent / 100.0f);
             float last_phi = 0;
 
-            for (float phi = 0; phi < 2 * M_PI; phi += 10.0 * M_PI / 180.0)
+            for (float phi = 0; phi < 2 * M_PI; phi += 10.0f * M_PI / 180.0f)
             {
                 const float s = std::sin(phi);
                 const float c = std::cos(phi);
 
-                cv::Point2f p_rel(c * r, s * r);
-                cv::Point2f p = corner + p_rel;
+                const cv::Point2f p = corner + cv::Point2f(c * r, s * r);
 
                 cv::Mat patch;
                 cv::getRectSubPix(img_binary, cv::Size(1, 1), p, patch);
 
                 const bool binary_color = *patch.data < 128;
 
-                // Init first section
                 if (sections.empty())
                 {
                     sections.emplace_back(0, phi);
                     section_colors.emplace_back(binary_color);
                 }
 
-                // Continue last section
                 if (binary_color == section_colors.back())
                 {
                     sections.back().second = phi;
                 }
-                // Start new section
                 else
                 {
                     sections.emplace_back(last_phi, phi);
@@ -368,7 +332,6 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
                 last_phi = phi;
             }
 
-            // Merge first and last section, if they are identical
             if (section_colors.front() == section_colors.back())
             {
                 sections.front().first = sections.back().first - 2 * M_PI;
@@ -381,7 +344,6 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
             {
                 corner_valid = false;
             }
-            // Correct number of sections => Check angles for similarity
             else
             {
                 const float angle_diff_1 = std::abs(std::abs(sections[0].second - sections[0].first) -
@@ -389,7 +351,7 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
                 const float angle_diff_2 = std::abs(std::abs(sections[1].second - sections[1].first) -
                                                     std::abs(sections[3].second - sections[3].first));
 
-                if (std::max(angle_diff_1, angle_diff_2) > 30.0 * M_PI / 180.0)
+                if (std::max(angle_diff_1, angle_diff_2) > 30.0f * M_PI / 180.0f)
                 {
                     corner_valid = false;
                 }
@@ -410,161 +372,84 @@ void AprilTagDetector::filterCrossCorners(cv::Mat& img,
 
     removeBadTags(tag_detections);
 
-    ROS_INFO_STREAM("Filtered " << invalid_tags << " tags out, returning " << tag_detections.size() << " tags.");
+    if (info_logger_)
+    {
+        info_logger_("Filtered " + std::to_string(invalid_tags) + " tags out, returning " +
+                     std::to_string(tag_detections.size()) + " tags.");
+    }
 }
 
-void AprilTagDetector::filterUnknownTags(std::vector<AprilTags::TagDetection>& tag_detections) noexcept
+void AprilTagDetector::filterUnknownTags(std::vector<AprilTags::TagDetection>& tag_detections,
+                                         const std::function<bool(int)>& is_known_tag) noexcept
 {
     for (AprilTags::TagDetection& tag : tag_detections)
     {
-        apriltag_ros::TagDescription* tag_description;
-        if (tag.good && !tag_config_.findTagDescription(tag.id, tag_description, false))
+        if (tag.good && !is_known_tag(tag.id))
         {
             tag.good = false;
         }
     }
+
     removeBadTags(tag_detections);
 
-    ROS_INFO_STREAM("Found " << tag_detections.size() << " known tags.");
+    if (info_logger_)
+    {
+        info_logger_("Found " + std::to_string(tag_detections.size()) + " known tags.");
+    }
 }
 
 void AprilTagDetector::removeBadTags(std::vector<AprilTags::TagDetection>& tag_detections) noexcept
 {
-    tag_detections.erase(remove_if(begin(tag_detections),
-                                   end(tag_detections),
-                                   [](AprilTags::TagDetection const& tag) { return tag.good == false; }),
+    tag_detections.erase(std::remove_if(begin(tag_detections),
+                                        end(tag_detections),
+                                        [](const AprilTags::TagDetection& tag) { return !tag.good; }),
                          end(tag_detections));
 }
 
-bool AprilTagDetector::getPose(AprilTags::TagDetection& tag, geometry_msgs::Pose& pose) noexcept
+void AprilTagDetector::drawTagDetections(cv::Mat& img,
+                                         const std::vector<AprilTags::TagDetection>& tag_detections) const noexcept
 {
-    apriltag_ros::TagDescription* tag_description;
-    if (tag_config_.findTagDescription(tag.id, tag_description))
+    const int line_thickness = img.size[0] / 400;
+
+    for (const AprilTags::TagDetection& tag : tag_detections)
     {
-        Eigen::Matrix4d htm = tag.getRelativeTransform(
-            tag_description->size, camera_model_.fx(), camera_model_.fy(), camera_model_.cx(), camera_model_.cy());
-        Eigen::Matrix3d rot = htm.block(0, 0, 3, 3);
-        Eigen::Quaternion<double> rot_quaternion(rot);
-
-        pose.position.x = htm(0, 3);
-        pose.position.y = htm(1, 3);
-        pose.position.z = htm(2, 3);
-        pose.orientation.x = rot_quaternion.x();
-        pose.orientation.y = rot_quaternion.y();
-        pose.orientation.z = rot_quaternion.z();
-        pose.orientation.w = rot_quaternion.w();
-
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-void AprilTagDetector::publishTagDetections(std::vector<AprilTags::TagDetection>& tag_detections,
-                                            std_msgs::Header header) noexcept
-{
-    apriltags_msgs::AprilTagDetections detections_msg;
-    detections_msg.header = header;
-    for (AprilTags::TagDetection& tag : tag_detections)
-    {
-        apriltags_msgs::AprilTag tag_msg;
-        geometry_msgs::Point p;
-        p.z = 0;
-        for (int i = 0; i < 4; i++)
-        {
-            p.x = tag.p[i].first;
-            p.y = tag.p[i].second;
-            tag_msg.corners_px.push_back(p);
-        }
-        tag_msg.id = std::to_string(tag.id);
-        tag_msg.pose_valid = getPose(tag, tag_msg.pose_3d);
-        detections_msg.detections.push_back(tag_msg);
-    }
-
-    detections_msg.input_image = *cv_bridge::CvImage(header, "rgb8", image_).toImageMsg();
-    detections_pub_.publish(detections_msg);
-}
-
-void AprilTagDetector::publishTfTransform(std::vector<AprilTags::TagDetection>& tag_detections,
-                                          std_msgs::Header header) noexcept
-{
-    static tf2_ros::TransformBroadcaster br;
-
-    for (AprilTags::TagDetection& tag : tag_detections)
-    {
-        apriltag_ros::TagDescription* tag_description;
-        if (tag_config_.findTagDescription(tag.id, tag_description) && tag_description->frame_name != "")
-        {
-            geometry_msgs::Pose pose;
-            bool pose_valid = getPose(tag, pose);
-
-            if (pose_valid)
-            {
-                static tf2_ros::TransformBroadcaster br;
-                geometry_msgs::TransformStamped transformStamped;
-
-                transformStamped.header = header;
-                transformStamped.child_frame_id = tag_description->frame_name;
-                transformStamped.transform.translation.x = pose.position.x;
-                transformStamped.transform.translation.y = pose.position.y;
-                transformStamped.transform.translation.z = pose.position.z;
-                transformStamped.transform.rotation.x = pose.orientation.x;
-                transformStamped.transform.rotation.y = pose.orientation.y;
-                transformStamped.transform.rotation.z = pose.orientation.z;
-                transformStamped.transform.rotation.w = pose.orientation.w;
-
-                br.sendTransform(transformStamped);
-            }
-        }
-    }
-}
-
-void AprilTagDetector::drawTagDetections(cv::Mat& img, std::vector<AprilTags::TagDetection>& tag_detections) noexcept
-{
-    int line_thickness = img.size[0] / 400;
-
-    for (AprilTags::TagDetection& tag : tag_detections)
-    {
-        int tag_size_px =
+        const int tag_size_px =
             std::max(std::abs(tag.p[0].first - tag.p[1].first), std::abs(tag.p[1].first - tag.p[2].first));
-        double fontscale = tag_size_px / 70.0;
-        double text_thickness = fontscale * 3;
+        const double fontscale = tag_size_px / 70.0;
+        const double text_thickness = fontscale * 3;
 
-        // plot outline
         cv::line(img,
                  cv::Point2f(tag.p[0].first, tag.p[0].second),
                  cv::Point2f(tag.p[1].first, tag.p[1].second),
-                 cv::viz::Color::red(),
+                 cv::Scalar(0, 0, 255),
                  line_thickness);
         cv::line(img,
                  cv::Point2f(tag.p[1].first, tag.p[1].second),
                  cv::Point2f(tag.p[2].first, tag.p[2].second),
-                 cv::viz::Color::green(),
+                 cv::Scalar(0, 255, 0),
                  line_thickness);
         cv::line(img,
                  cv::Point2f(tag.p[2].first, tag.p[2].second),
                  cv::Point2f(tag.p[3].first, tag.p[3].second),
-                 cv::viz::Color::blue(),
+                 cv::Scalar(255, 0, 0),
                  line_thickness);
         cv::line(img,
                  cv::Point2f(tag.p[3].first, tag.p[3].second),
                  cv::Point2f(tag.p[0].first, tag.p[0].second),
-                 cv::viz::Color::magenta(),
+                 cv::Scalar(255, 0, 255),
                  line_thickness);
 
-        // print tag id
-        cv::String text = std::to_string(tag.id);
-        int fontface = cv::FONT_HERSHEY_SIMPLEX;
+        const cv::String text = std::to_string(tag.id);
+        const int fontface = cv::FONT_HERSHEY_SIMPLEX;
         int baseline;
-        cv::Size textsize = cv::getTextSize(text, fontface, fontscale, text_thickness, &baseline);
+        const cv::Size textsize = cv::getTextSize(text, fontface, fontscale, text_thickness, &baseline);
         cv::putText(img,
                     text,
-                    cv::Point((int)(tag.cxy.first - textsize.width / 2), (int)(tag.cxy.second + textsize.height / 2)),
+                    cv::Point(static_cast<int>(tag.cxy.first - textsize.width / 2),
+                              static_cast<int>(tag.cxy.second + textsize.height / 2)),
                     fontface,
                     fontscale,
-                    cv::viz::Color::azure(),
+                    cv::Scalar(255, 255, 0),
                     text_thickness);
     }
 }

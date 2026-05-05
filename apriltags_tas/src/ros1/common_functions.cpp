@@ -29,7 +29,7 @@
  * Technology.
  */
 
-#include <apriltag_ros/common_functions.h>
+#include <apriltag_ros/ros1/common_functions.h>
 
 namespace apriltag_ros
 {

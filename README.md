@@ -5,11 +5,13 @@ It also includes the improvements proposed in the __ICRA 2020__ Paper __Determin
 
 **Authors**: Jan Kallwies, Bianca Forkel
 
-## Quickstart
+> **Note:** This branch is an LLM-assisted extension of the original ROS 1 package. It adds simultaneous ROS 1 and ROS 2 support using a shared core, selectable at build time via the `ROS_VERSION` environment variable.
 
-Starting with a working ROS installation (Kinetic and Melodic are supported):
+## Quickstart (ROS 1)
+
+Starting with a working ROS installation (tested with Kinetic, Melodic, and Noetic):
 ```
-export ROS_DISTRO=melodic               # Set this to your distro, e.g. kinetic or melodic
+export ROS_DISTRO=noetic               # Set this to your distro, e.g. kinetic, melodic, or noetic
 source /opt/ros/$ROS_DISTRO/setup.bash  # Source your ROS distro 
 mkdir -p ~/catkin_ws/src                # Make a new workspace 
 cd ~/catkin_ws/src                      # Navigate to the source space
@@ -17,12 +19,33 @@ git clone https://github.com/UniBwTAS/apriltags_tas.git      # Clone the git rep
 cd ~/catkin_ws                          # Navigate to the workspace
 rosdep install --from-paths src --ignore-src -r -y  # Install any missing packages
 catkin build    # Build all packages in the workspace (catkin_make_isolated will work also)
+source devel/setup.bash
 
 # Start it by:
 roslaunch apriltags_tas apriltag_detection.launch
 ```
 
-In order to use the detector with your own image, please change the example image path or the image topic to be subscribed in the launch file `apriltag_detection.launch`.
+## Quickstart (ROS 2)
+
+Starting with a working ROS 2 installation (tested with Foxy and Jazzy):
+```
+export ROS_DISTRO=jazzy                 # Set this to your distro, e.g. foxy or jazzy
+source /opt/ros/$ROS_DISTRO/setup.bash  # Source your ROS distro
+mkdir -p ~/ros2_ws/src                  # Make a new workspace
+cd ~/ros2_ws/src                        # Navigate to the source space
+git clone https://github.com/UniBwTAS/apriltags_tas.git      # Clone the git repository
+cd ~/ros2_ws                            # Navigate to the workspace
+rosdep install --from-paths src --ignore-src -r -y  # Install any missing packages
+colcon build    # Build all packages in the workspace
+source install/setup.bash
+
+# Start it by:
+ros2 launch apriltags_tas apriltag_detection.launch.xml
+```
+
+## Config
+
+In order to use the detector with your own image, please change the example image path or the image topic to be subscribed in the launch file.
 
 The configuration of the tag description is adopted from the ROS package [`apriltag_ros`](https://github.com/RIVeR-Lab/apriltags_ros). Please see [ROS wiki](http://wiki.ros.org/apriltag_ros) for details and tutorials.
 

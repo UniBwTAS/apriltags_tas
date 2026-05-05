@@ -6,8 +6,7 @@
 class EdgeCostFunctor
 {
   public:
-    EdgeCostFunctor(const cv::Mat& rawImg, const cv::Mat& maskImg)
-        : raw_img(rawImg), mask_img(maskImg)
+    EdgeCostFunctor(const cv::Mat& rawImg, const cv::Mat& maskImg) : raw_img(rawImg), mask_img(maskImg)
     {
         template_img.create(1, 2, CV_8U);
         template_img.data[0] = 0;
