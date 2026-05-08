@@ -32,13 +32,13 @@ int main(int argc, char** argv)
 
     apriltag_ros::TagDetector tag_config(nh);
 
-    AprilTagDetector apriltag_detector(camera_info, tag_config);
+    AprilTagDetector apriltag_detector(use_test_input_image, camera_info, tag_config);
 
     dynamic_reconfigure::Server<apriltags_tas::AprilTagDetectorConfig> reconfigure_server;
     reconfigure_server.setCallback(boost::bind(&AprilTagDetector::reconfigure, &apriltag_detector, _1, _2));
 
     apriltag_detector.detections_pub_ = nh.advertise<apriltags_msgs::AprilTagDetections>("detections", 1, false);
-    apriltag_detector.image_pub_ = nh.advertise<sensor_msgs::Image>("image", 1);
+    apriltag_detector.image_pub_ = nh.advertise<sensor_msgs::Image>("image", 1, true);
 
     std::unique_ptr<ros::Subscriber> sub;
 

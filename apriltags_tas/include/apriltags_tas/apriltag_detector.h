@@ -24,7 +24,9 @@
 class AprilTagDetector
 {
   public:
-    AprilTagDetector(const sensor_msgs::CameraInfo::ConstPtr& camera_info, apriltag_ros::TagDetector& tag_config);
+    AprilTagDetector(const bool use_test_image,
+                     const sensor_msgs::CameraInfo::ConstPtr& camera_info,
+                     apriltag_ros::TagDetector& tag_config);
 
     void reconfigure(apriltags_tas::AprilTagDetectorConfig& config, uint32_t level);
     void imageCallback(const sensor_msgs::ImageConstPtr& msg);
@@ -54,6 +56,7 @@ class AprilTagDetector
 
     std::shared_ptr<AprilTags::TagDetector> apriltag_cpp_detector_;
 
+    bool use_test_image_;
     image_geometry::PinholeCameraModel camera_model_;
     cv::Mat image_;
     std_msgs::Header img_header_;

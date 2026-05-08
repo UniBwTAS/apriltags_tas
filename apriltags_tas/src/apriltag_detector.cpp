@@ -10,9 +10,10 @@
 
 #include <chrono>
 
-AprilTagDetector::AprilTagDetector(const sensor_msgs::CameraInfo::ConstPtr& camera_info,
+AprilTagDetector::AprilTagDetector(const bool use_test_image,
+                                   const sensor_msgs::CameraInfo::ConstPtr& camera_info,
                                    apriltag_ros::TagDetector& tag_config)
-    : tag_config_(tag_config)
+    : use_test_image_(use_test_image), tag_config_(tag_config)
 {
     if (camera_info)
     {
@@ -74,7 +75,7 @@ void AprilTagDetector::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 void AprilTagDetector::process(const cv::Mat& image)
 {
-    if (detections_pub_.getNumSubscribers() == 0 && image_pub_.getNumSubscribers() == 0)
+    if (!use_test_image_ && detections_pub_.getNumSubscribers() == 0 && image_pub_.getNumSubscribers() == 0)
     {
         ROS_WARN_STREAM("No subscribers => Do not detect tags!");
 
@@ -143,8 +144,8 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
 {
     for (AprilTags::TagDetection& tag : tag_detections)
     {
-        std::pair<float, float> x_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::min());
-        std::pair<float, float> y_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::min());
+        std::pair<float, float> x_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
+        std::pair<float, float> y_range(std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest());
         for (std::pair<float, float>& corner_point : tag.p)
         {
             x_range.first = std::min(x_range.first, corner_point.first);
@@ -170,16 +171,7 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
 
             int line_thickness = 5;
 
-            auto nextCornerIndex = [](const int i) {
-                if (i <= 2)
-                {
-                    return i + 1;
-                }
-                else
-                {
-                    return 0;
-                }
-            };
+            auto nextCornerIndex = [](const int i) { return (i + 1) % 4; };
 
             for (int i = 0; i < 4; i++)
             {
@@ -224,7 +216,8 @@ void AprilTagDetector::refineCornerPointsByDirectEdgeOptimization(
                                           &estimated_edge_normals,
                                           &estimated_edge_offsets,
                                           &numeric_diff_options,
-                                          &nextCornerIndex](const int i) {
+                                          &nextCornerIndex](const int i)
+            {
                 const int pixel_count = cv::countNonZero(mask_images[i]);
 
                 ceres::CostFunction* cost_function =

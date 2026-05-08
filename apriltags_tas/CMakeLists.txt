@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.9)
 project(apriltags_tas)
 
 find_package(catkin_simple REQUIRED)
+find_package(Ceres REQUIRED)
 
 catkin_simple()
 
