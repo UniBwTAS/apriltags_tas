@@ -57,6 +57,7 @@ class AprilTagDetectorROS2
     const bool use_test_image_;
     image_geometry::PinholeCameraModel camera_model_;
     cv::Mat image_;
+    std::string image_encoding_{"bgr8"};
     std_msgs::msg::Header img_header_;
 
     apriltag_ros::TagDetector tag_config_;

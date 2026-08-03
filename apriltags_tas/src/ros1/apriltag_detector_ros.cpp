@@ -49,7 +49,9 @@ void AprilTagDetectorROS::reconfigure(apriltags_tas::AprilTagDetectorConfig& con
 
 void AprilTagDetectorROS::imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
-    image_ = cv_bridge::toCvShare(msg, "bgr8")->image.clone();
+    const cv_bridge::CvImageConstPtr cv_image = cv_bridge::toCvShare(msg, "bgr8");
+    image_ = cv_image->image.clone();
+    image_encoding_ = cv_image->encoding;
     img_header_ = msg->header;
 
     process(image_);
@@ -136,7 +138,7 @@ void AprilTagDetectorROS::publishTagDetections(std::vector<AprilTags::TagDetecti
         detections_msg.detections.push_back(tag_msg);
     }
 
-    detections_msg.input_image = *cv_bridge::CvImage(header, "rgb8", image_).toImageMsg();
+    detections_msg.input_image = *cv_bridge::CvImage(header, image_encoding_, image_).toImageMsg();
     detections_pub_.publish(detections_msg);
 }
 

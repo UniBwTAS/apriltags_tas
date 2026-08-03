@@ -200,7 +200,9 @@ AprilTagDetectorROS2::reconfigure(const std::vector<rclcpp::Parameter>& paramete
 
 void AprilTagDetectorROS2::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
-    image_ = cv_bridge::toCvShare(msg, "bgr8")->image.clone();
+    const cv_bridge::CvImageConstPtr cv_image = cv_bridge::toCvShare(msg, "bgr8");
+    image_ = cv_image->image.clone();
+    image_encoding_ = cv_image->encoding;
     img_header_ = msg->header;
 
     process(image_);
@@ -300,7 +302,7 @@ void AprilTagDetectorROS2::publishTagDetections(std::vector<AprilTags::TagDetect
         detections_msg.detections.push_back(tag_msg);
     }
 
-    detections_msg.input_image = *cv_bridge::CvImage(header, "rgb8", image_).toImageMsg();
+    detections_msg.input_image = *cv_bridge::CvImage(header, image_encoding_, image_).toImageMsg();
     last_detections_msg_ = std::make_shared<apriltags_msgs::msg::AprilTagDetections>(detections_msg);
     detections_pub_->publish(detections_msg);
 }
