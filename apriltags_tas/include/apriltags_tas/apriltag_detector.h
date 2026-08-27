@@ -35,6 +35,7 @@ struct Config
     double filter_cross_corners_radius_percent{5.0};
     bool publish_tf{true};
     bool draw_image{true};
+    double upscale_factor{1.0};
 };
 
 class AprilTagDetector

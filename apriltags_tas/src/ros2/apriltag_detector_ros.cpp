@@ -185,6 +185,10 @@ AprilTagDetectorROS2::reconfigure(const std::vector<rclcpp::Parameter>& paramete
             {
                 updated_config.draw_image = parameter.as_bool();
             }
+            else if (name == "upscale_factor")
+            {
+                updated_config.upscale_factor = parameter.as_double();
+            }
         }
         catch (const rclcpp::ParameterTypeException& e)
         {

@@ -171,6 +171,7 @@ int main(int argc, char** argv)
         node->declare_parameter<double>("filter_cross_corners_radius_percent", 5.0);
     current_config.publish_tf = node->declare_parameter<bool>("publish_tf", true);
     current_config.draw_image = node->declare_parameter<bool>("draw_image", true);
+    current_config.upscale_factor = node->declare_parameter<double>("upscale_factor", 1.0);
 
     sensor_msgs::msg::CameraInfo::SharedPtr camera_info;
 

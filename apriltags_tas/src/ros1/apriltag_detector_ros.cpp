@@ -38,6 +38,7 @@ void AprilTagDetectorROS::reconfigure(apriltags_tas::AprilTagDetectorConfig& con
     config_.filter_cross_corners_radius_percent = config.filter_cross_corners_radius_percent;
     config_.publish_tf = config.publish_tf;
     config_.draw_image = config.draw_image;
+    config_.upscale_factor = config.upscale_factor;
 
     core_.reconfigure(config_, level);
 

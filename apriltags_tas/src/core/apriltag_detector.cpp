@@ -60,7 +60,35 @@ std::vector<AprilTags::TagDetection> AprilTagDetector::process(const cv::Mat& im
     cv::Mat gray_image;
     cv::cvtColor(image_bgr, gray_image, cv::COLOR_BGR2GRAY);
 
-    std::vector<AprilTags::TagDetection> tag_detections = detectAprilTags(gray_image);
+    std::vector<AprilTags::TagDetection> tag_detections;
+    if (config_.upscale_factor > 1.0)
+    {
+        cv::Mat upscaled_image;
+        cv::resize(gray_image,
+                   upscaled_image,
+                   cv::Size(),
+                   config_.upscale_factor,
+                   config_.upscale_factor,
+                   cv::INTER_CUBIC);
+
+        tag_detections = detectAprilTags(upscaled_image);
+
+        for (AprilTags::TagDetection& tag : tag_detections)
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                tag.p[i].first /= config_.upscale_factor;
+                tag.p[i].second /= config_.upscale_factor;
+            }
+            tag.cxy.first /= config_.upscale_factor;
+            tag.cxy.second /= config_.upscale_factor;
+            tag.observedPerimeter /= config_.upscale_factor;
+        }
+    }
+    else
+    {
+        tag_detections = detectAprilTags(gray_image);
+    }
 
     if (config_.only_known_tags)
     {
